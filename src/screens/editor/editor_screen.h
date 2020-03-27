@@ -26,8 +26,9 @@ class EditorScreen : public Screen {
   Uint8 *pixels_ = new Uint8[WIDTH * HEIGHT * 4];
   vector<vector<pair<float, float>>> points_;
   int active_vector_{-1};
-  EditorState cur_state_{NEW};
+  EditorState cur_state_{ADD};
   int selected_point_;
+  bool editing{false};
 
   void Draw() override;
 
@@ -47,8 +48,11 @@ class EditorScreen : public Screen {
 
   static bool IsOnCurve(const Vector2i &pos, const vector<pair<float, float>> &points);
 
-  // возвращает тип точки, на которую нажали, либо -1, если мимо
   static int IsOnPoint(const Vector2i &pos, const vector<pair<float, float>> &points);
+
+  void Edit(const Vector2i &pos);
+
+  void Remove(const Vector2i &pos);
 };
 
 #endif

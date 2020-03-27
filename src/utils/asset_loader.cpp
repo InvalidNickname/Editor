@@ -6,7 +6,14 @@ AssetLoader &AssetLoader::Get() {
 }
 
 AssetLoader::AssetLoader() {
-  LoadTexture("btn_temp.png", "btn_temp");
+  LoadTexture("btn_add.png", "btn_add_0", {0, 0, 64, 64});
+  LoadTexture("btn_add.png", "btn_add_1", {64, 0, 64, 64});
+  LoadTexture("btn_edit.png", "btn_edit_0", {0, 0, 64, 64});
+  LoadTexture("btn_edit.png", "btn_edit_1", {64, 0, 64, 64});
+  LoadTexture("btn_remove.png", "btn_remove_0", {0, 0, 64, 64});
+  LoadTexture("btn_remove.png", "btn_remove_1", {64, 0, 64, 64});
+  LoadTexture("btn_select.png", "btn_select_0", {0, 0, 64, 64});
+  LoadTexture("btn_select.png", "btn_select_1", {64, 0, 64, 64});
 }
 
 Texture *AssetLoader::GetTexture(const string &name) const {

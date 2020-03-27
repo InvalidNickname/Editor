@@ -25,34 +25,36 @@ void EditorScreen::Prepare() {
 
 void EditorScreen::SetGUI() {
   gui_ = new GUI();
-  gui_->AddObject("btn_select", new Button(
-      Vector2f(0, 0),
-      Vector2f(32, 32),
-      AssetLoader::Get().GetTexture("btn_temp"),
-      AssetLoader::Get().GetTexture("btn_temp"),
-      [this]() { cur_state_ = SELECT; }
-  ));
-  gui_->AddObject("btn_new", new Button(
-      Vector2f(0, 32),
-      Vector2f(32, 32),
-      AssetLoader::Get().GetTexture("btn_temp"),
-      AssetLoader::Get().GetTexture("btn_temp"),
-      [this]() { cur_state_ = NEW; }
-  ));
-  gui_->AddObject("btn_delete", new Button(
-      Vector2f(0, 64),
-      Vector2f(32, 32),
-      AssetLoader::Get().GetTexture("btn_temp"),
-      AssetLoader::Get().GetTexture("btn_temp"),
-      [this]() { cur_state_ = DELETE; }
-  ));
-  gui_->AddObject("btn_edit", new Button(
-      Vector2f(0, 96),
-      Vector2f(32, 32),
-      AssetLoader::Get().GetTexture("btn_temp"),
-      AssetLoader::Get().GetTexture("btn_temp"),
-      [this]() { cur_state_ = EDIT; }
-  ));
+  gui_->AddObject("menu", new RadioButtons(new map<string, Button *>{
+      pair("btn_select", new Button(
+          Vector2f(0, 0),
+          Vector2f(32, 32),
+          AssetLoader::Get().GetTexture("btn_select_0"),
+          AssetLoader::Get().GetTexture("btn_select_1"),
+          [this]() { cur_state_ = SELECT; }
+      )),
+      pair("btn_add", new Button(
+          Vector2f(0, 32),
+          Vector2f(32, 32),
+          AssetLoader::Get().GetTexture("btn_add_0"),
+          AssetLoader::Get().GetTexture("btn_add_1"),
+          [this]() { cur_state_ = ADD; }
+      )),
+      pair("btn_remove", new Button(
+          Vector2f(0, 64),
+          Vector2f(32, 32),
+          AssetLoader::Get().GetTexture("btn_remove_0"),
+          AssetLoader::Get().GetTexture("btn_remove_1"),
+          [this]() { cur_state_ = DELETE; }
+      )),
+      pair("btn_edit", new Button(
+          Vector2f(0, 96),
+          Vector2f(32, 32),
+          AssetLoader::Get().GetTexture("btn_edit_0"),
+          AssetLoader::Get().GetTexture("btn_edit_1"),
+          [this]() { cur_state_ = EDIT; }
+      ))
+  }, "btn_select"));
 }
 
 AppState EditorScreen::DoAction() {
@@ -67,53 +69,32 @@ void EditorScreen::HandleInput() {
     if (event.type == Event::MouseButtonPressed) {
       if (Mouse::isButtonPressed(Mouse::Left)) {
         Vector2i pos = Mouse::getPosition();
-        if (gui_->CheckClicked(Vector2f(pos.x, pos.y)));
-        else if (pos.x > 32) {
+        if (gui_->CheckClicked(Vector2f(pos.x, pos.y))) {
+
+        } else if (pos.x > 32) {
           switch (cur_state_) {
-            case NEW:
+            case ADD:
               if (active_vector_ == -1) {
                 points_.emplace_back();
                 active_vector_ = points_.size() - 1;
               }
-              points_[active_vector_].emplace_back(pos.x - 100, pos.y); // направляющая 1
+              points_[active_vector_].emplace_back(pos.x - 50, pos.y); // направляющая 1
               points_[active_vector_].emplace_back(pos.x, pos.y); // опорная
-              points_[active_vector_].emplace_back(pos.x + 100, pos.y); // направляющая 2
+              points_[active_vector_].emplace_back(pos.x + 50, pos.y); // направляющая 2
               break;
             case EDIT:
               if (active_vector_ != -1) {
-                selected_point_ = IsOnPoint(pos, points_[active_vector_]);
-                if (selected_point_ != -1) cur_state_ = EDITING;
-              }
-              break;
-            case EDITING:
-              if (selected_point_ % 3 == 1) {
-                //выбрана опорная точка
-                float dx = points_[active_vector_][selected_point_].first - pos.x;
-                float dy = points_[active_vector_][selected_point_].second - pos.y;
-                points_[active_vector_][selected_point_ - 1].first -= dx;
-                points_[active_vector_][selected_point_ - 1].second -= dy;
-                points_[active_vector_][selected_point_ + 1].first -= dx;
-                points_[active_vector_][selected_point_ + 1].second -= dy;
-                points_[active_vector_][selected_point_].first = pos.x;
-                points_[active_vector_][selected_point_].second = pos.y;
-              } else if (selected_point_ % 3 == 0) {
-                // выбрана 1 направляющая
-                float dx = points_[active_vector_][selected_point_].first - pos.x;
-                float dy = points_[active_vector_][selected_point_].second - pos.y;
-                points_[active_vector_][selected_point_ + 2].first += dx;
-                points_[active_vector_][selected_point_ + 2].second += dy;
-                points_[active_vector_][selected_point_].first = pos.x;
-                points_[active_vector_][selected_point_].second = pos.y;
-              } else {
-                float dx = points_[active_vector_][selected_point_].first - pos.x;
-                float dy = points_[active_vector_][selected_point_].second - pos.y;
-                points_[active_vector_][selected_point_ - 2].first += dx;
-                points_[active_vector_][selected_point_ - 2].second += dy;
-                points_[active_vector_][selected_point_].first = pos.x;
-                points_[active_vector_][selected_point_].second = pos.y;
+                if (!editing) {
+                  selected_point_ = IsOnPoint(pos, points_[active_vector_]);
+                  if (selected_point_ != -1) editing = true;
+                } else {
+                  Edit(pos);
+                  editing = false;
+                }
               }
               break;
             case DELETE:
+              Remove(pos);
               break;
             case SELECT:
               bool found{false};
@@ -140,6 +121,7 @@ void EditorScreen::HandleInput() {
 
 void EditorScreen::Draw() {
   window_->setView(ui_);
+  window_->clear(GRAY);
   window_->draw(canvas_);
   DrawHelpers();
   gui_->Render(window_);
@@ -242,4 +224,69 @@ int EditorScreen::IsOnPoint(const Vector2i &pos, const vector<pair<float, float>
     }
   }
   return -1;
+}
+
+void EditorScreen::Edit(const Vector2i &pos) {
+  float dx = points_[active_vector_][selected_point_].first - pos.x;
+  float dy = points_[active_vector_][selected_point_].second - pos.y;
+  points_[active_vector_][selected_point_] = {pos.x, pos.y};
+  if (selected_point_ % 3 == 1) {
+    //выбрана опорная точка
+    points_[active_vector_][selected_point_ - 1].first -= dx;
+    points_[active_vector_][selected_point_ - 1].second -= dy;
+    points_[active_vector_][selected_point_ + 1].first -= dx;
+    points_[active_vector_][selected_point_ + 1].second -= dy;
+  } else if (selected_point_ % 3 == 0) {
+    // выбрана 1 направляющая
+    points_[active_vector_][selected_point_ + 2].first += dx;
+    points_[active_vector_][selected_point_ + 2].second += dy;
+  } else {
+    // выбрана 2 направляющая
+    points_[active_vector_][selected_point_ - 2].first += dx;
+    points_[active_vector_][selected_point_ - 2].second += dy;
+  }
+}
+
+void EditorScreen::Remove(const Vector2i &pos) {
+  if (active_vector_ != -1) {
+    selected_point_ = IsOnPoint(pos, points_[active_vector_]);
+    if (selected_point_ != -1 && selected_point_ % 3 == 1) {
+      if (selected_point_ == 1) {
+        // обрезание левого края
+        if (points_[active_vector_].size() == 6) {
+          // остается одна точка из 2, удаляем обе
+          points_.erase(points_.begin() + active_vector_);
+          active_vector_ = -1;
+        } else {
+          points_[active_vector_].erase(points_[active_vector_].begin(),
+                                        points_[active_vector_].begin() + 3);
+        }
+      } else if (selected_point_ == points_[active_vector_].size() - 2) {
+        // обрезание правого края
+        if (points_[active_vector_].size() == 6) {
+          // остается одна точка из 2, удаляем обе
+          points_.erase(points_.begin() + active_vector_);
+          active_vector_ = -1;
+        } else {
+          points_[active_vector_].erase(points_[active_vector_].end() - 3,
+                                        points_[active_vector_].end());
+        }
+      } else {
+        // вырезание из центра, делится на 2 части
+        if (points_[active_vector_].size() == 9) {
+          // при вырезании центра из 3 точек, остаются 2 одиночные точки. удаляем их
+          points_.erase(points_.begin() + active_vector_);
+          active_vector_ = -1;
+        } else {
+          points_.emplace_back(points_[active_vector_].size() - selected_point_ - 2);
+          std::copy(points_[active_vector_].begin() + selected_point_ + 2,
+                    points_[active_vector_].end(),
+                    points_.back().begin());
+          points_[active_vector_].erase(points_[active_vector_].begin() + selected_point_ - 1,
+                                        points_[active_vector_].end());
+        }
+      }
+      selected_point_ = -1;
+    }
+  }
 }
