@@ -6,7 +6,7 @@ AssetLoader &AssetLoader::Get() {
 }
 
 AssetLoader::AssetLoader() {
-
+  LoadTexture("btn_temp.png", "btn_temp");
 }
 
 Texture *AssetLoader::GetTexture(const string &name) const {
