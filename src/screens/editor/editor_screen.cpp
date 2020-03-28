@@ -6,18 +6,20 @@ void EditorScreen::Prepare() {
   // начальные размеры экрана
   initial_size_ = window_size_ / 2u;
   // установка камеры
-  ui_.setSize((float) initial_size_.x, (float) initial_size_.y);
+  ui_.setSize(Vector2f(initial_size_.x, initial_size_.y));
   ui_.setCenter(ui_.getSize() / 2.f);
   // создание GUI
   SetGUI();
   // создание холста
-  for (int i = 0; i < WIDTH * HEIGHT * 4; i++) {
+  canvas_size_ = window_size_ - GUI_SIZE;
+  pixels_ = new Uint8[canvas_size_.x * canvas_size_.y * 4];
+  for (size_t i = 0; i < canvas_size_.x * canvas_size_.y * 4; i++) {
     pixels_[i] = 255;
   }
-  texture_.create(WIDTH, HEIGHT);
+  texture_.create(canvas_size_.x, canvas_size_.y);
   texture_.update(pixels_);
   canvas_.setTexture(texture_);
-  canvas_.setPosition(32, 0);
+  canvas_.setPosition(GUI_SIZE.x, GUI_SIZE.y);
   // установка view для интерфейса
   ui_.setSize((Vector2f) window_size_);
   ui_.setCenter((Vector2f) initial_size_);
@@ -27,28 +29,35 @@ void EditorScreen::SetGUI() {
   gui_ = new GUI();
   gui_->AddObject("menu", new RadioButtons(new map<string, Button *>{
       pair("btn_select", new Button(
-          Vector2f(0, 0),
+          Vector2f(0, GUI_SIZE.y),
           Vector2f(32, 32),
           AssetLoader::Get().GetTexture("btn_select_0"),
           AssetLoader::Get().GetTexture("btn_select_1"),
           [this]() { cur_state_ = SELECT; }
       )),
       pair("btn_add", new Button(
-          Vector2f(0, 32),
+          Vector2f(0, GUI_SIZE.y + 32),
           Vector2f(32, 32),
           AssetLoader::Get().GetTexture("btn_add_0"),
           AssetLoader::Get().GetTexture("btn_add_1"),
           [this]() { cur_state_ = ADD; }
       )),
       pair("btn_remove", new Button(
-          Vector2f(0, 64),
+          Vector2f(0, GUI_SIZE.y + 64),
+          Vector2f(32, 32),
+          AssetLoader::Get().GetTexture("btn_remove_2_0"),
+          AssetLoader::Get().GetTexture("btn_remove_2_1"),
+          [this]() { cur_state_ = DELETE; }
+      )),
+      pair("btn_remove_2", new Button(
+          Vector2f(0, GUI_SIZE.y + 96),
           Vector2f(32, 32),
           AssetLoader::Get().GetTexture("btn_remove_0"),
           AssetLoader::Get().GetTexture("btn_remove_1"),
-          [this]() { cur_state_ = DELETE; }
+          [this]() { cur_state_ = DELETE_2; }
       )),
       pair("btn_edit", new Button(
-          Vector2f(0, 96),
+          Vector2f(0, GUI_SIZE.y + 128),
           Vector2f(32, 32),
           AssetLoader::Get().GetTexture("btn_edit_0"),
           AssetLoader::Get().GetTexture("btn_edit_1"),
@@ -69,48 +78,63 @@ void EditorScreen::HandleInput() {
     if (event.type == Event::MouseButtonPressed) {
       if (Mouse::isButtonPressed(Mouse::Left)) {
         Vector2i pos = Mouse::getPosition();
-        if (gui_->CheckClicked(Vector2f(pos.x, pos.y))) {
+        Vector2f posf(pos.x, pos.y);
+        if (gui_->CheckClicked(posf)) {
 
-        } else if (pos.x > 32) {
-          switch (cur_state_) {
-            case ADD:
-              if (active_vector_ == -1) {
-                points_.emplace_back();
-                active_vector_ = points_.size() - 1;
+        } else if (pos.x > GUI_SIZE.x && pos.y > GUI_SIZE.y) {
+          if (cur_curve_ == -1 && cur_state_ == ADD) {
+            curves_.push_back({Vector2f(posf.x - 50, posf.y), posf, Vector2f(posf.x + 50, posf.y)});
+            cur_curve_ = curves_.size() - 1;
+          } else if (cur_state_ == SELECT) {
+            bool found{false};
+            for (int i = 0; i < curves_.size(); ++i) {
+              if (IsCurveSelected(pos, curves_[i])) {
+                cur_curve_ = i;
+                found = true;
+                break;
               }
-              points_[active_vector_].emplace_back(pos.x - 50, pos.y); // направляющая 1
-              points_[active_vector_].emplace_back(pos.x, pos.y); // опорная
-              points_[active_vector_].emplace_back(pos.x + 50, pos.y); // направляющая 2
-              break;
-            case EDIT:
-              if (active_vector_ != -1) {
-                if (!editing) {
-                  selected_point_ = IsOnPoint(pos, points_[active_vector_]);
-                  if (selected_point_ != -1) editing = true;
+            }
+            if (!found) cur_curve_ = -1;
+          } else if (cur_curve_ != -1) {
+            vector<Vector2f> &curve = curves_[cur_curve_];
+            switch (cur_state_) {
+              case ADD:
+                curve.emplace_back(posf.x - 50, posf.y); // направляющая 1
+                curve.push_back(posf); // опорная
+                curve.emplace_back(posf.x + 50, posf.y); // направляющая 2
+                break;
+              case EDIT:
+                if (!editing_) {
+                  cur_point_ = GetSelectedPoint(pos, curve);
+                  if (cur_point_ != -1) editing_ = true;
                 } else {
-                  Edit(pos);
-                  editing = false;
+                  EditPoint(posf, cur_point_, curve);
+                  editing_ = false;
                 }
-              }
-              break;
-            case DELETE:
-              Remove(pos);
-              break;
-            case SELECT:
-              bool found{false};
-              for (int i = 0; i < points_.size(); ++i) {
-                if (IsOnCurve(pos, points_[i])) {
-                  active_vector_ = i;
-                  found = true;
-                  break;
+                break;
+              case DELETE:
+                cur_point_ = GetSelectedPoint(pos, curve);
+                RemovePoint(cur_point_, cur_curve_, curves_);
+                break;
+              case DELETE_2:
+                cur_point_ = GetSelectedPoint(pos, curve);
+                if (cur_point_ != -1 && cur_point_ % 3 == 1) {
+                  if (curve.size() == 6) {
+                    // остается одна точка из 2, удаляем обе
+                    curves_.erase(curves_.begin() + cur_curve_);
+                    cur_curve_ = -1;
+                  } else {
+                    curve.erase(curve.begin() + cur_point_ - 1, curve.begin() + cur_point_ + 2);
+                  }
                 }
-              }
-              if (!found) active_vector_ = -1;
-              break;
+                break;
+              case SELECT:
+                break;
+            }
           }
         }
       } else if (Mouse::isButtonPressed(Mouse::Right)) {
-        active_vector_ = -1;
+        cur_curve_ = -1;
       }
     }
     if (event.type == Event::Closed) {
@@ -129,85 +153,76 @@ void EditorScreen::Draw() {
 
 void EditorScreen::UpdateTexture() {
   // очистка экрана
-  for (int i = 0; i < WIDTH * HEIGHT * 4; i++) {
+  for (size_t i = 0; i < canvas_size_.x * canvas_size_.y * 4; i++) {
     pixels_[i] = 255;
   }
   // отрисовка кривых
-  for (const auto &i:points_) {
+  for (const auto &i:curves_) {
     DrawCurve(i);
   }
   texture_.update(pixels_);
 }
 
-void EditorScreen::DrawCurve(const vector<pair<float, float>> &points) {
-  for (int i = 1; i < points.size(); i += 3) {
-    if (points.size() - i < 4) break;
+void EditorScreen::DrawCurve(const vector<Vector2f> &curve) {
+  for (size_t i = 1; i < curve.size(); i += 3) {
+    if (curve.size() - i < 4) break;
     for (size_t j = 0; j <= 10000; ++j) {
       float t = j / 10000.f;
 
-      float cx = 3.f * (points[i + 1].first - points[i].first);
-      float bx = 3.f * (points[i + 2].first - points[i + 1].first) - cx;
-      float ax = points[i + 3].first - points[i].first - bx - cx;
+      Vector2f c = 3.f * (curve[i + 1] - curve[i]);
+      Vector2f b = 3.f * (curve[i + 2] - curve[i + 1]) - c;
+      Vector2f a = curve[i + 3] - curve[i] - b - c;
 
-      float cy = 3.f * (points[i + 1].second - points[i].second);
-      float by = 3.f * (points[i + 2].second - points[i + 1].second) - cy;
-      float ay = points[i + 3].second - points[i].second - by - cy;
+      Vector2f tmp_res = a * pow(t, 3) + b * pow(t, 2) + c * t + curve[i];
+      Vector2i res(tmp_res.x - GUI_SIZE.x, tmp_res.y - GUI_SIZE.y);
 
-      int x = (int) (ax * pow(t, 3) + bx * pow(t, 2) + cx * t + points[i].first) - 32;
-      int y = (int) (ay * pow(t, 3) + by * pow(t, 2) + cy * t + points[i].second);
-
-      pixels_[(x + y * WIDTH) * 4] = 0;
-      pixels_[(x + y * WIDTH) * 4 + 1] = 0;
-      pixels_[(x + y * WIDTH) * 4 + 2] = 0;
+      pixels_[(res.x + res.y * canvas_size_.x) * 4] = 0;
+      pixels_[(res.x + res.y * canvas_size_.x) * 4 + 1] = 0;
+      pixels_[(res.x + res.y * canvas_size_.x) * 4 + 2] = 0;
     }
   }
 }
 
 void EditorScreen::DrawHelpers() {
-  if (active_vector_ != -1) {
-    uint32_t size = points_[active_vector_].size();
+  if (cur_curve_ != -1) {
+    size_t size = curves_[cur_curve_].size();
     // отрисовка активных точек
-    vector<RectangleShape> main_points_{size, RectangleShape({6.f, 6.f})};
-    for (int i = 0; i < size; ++i) {
-      main_points_[i].setFillColor(GRAY);
-      main_points_[i].setOrigin(3, 3);
-      main_points_[i].setPosition(points_[active_vector_][i].first, points_[active_vector_][i].second);
+    vector<RectangleShape> main_points{size, RectangleShape({6.f, 6.f})};
+    for (size_t i = 0; i < size; ++i) {
+      main_points[i].setFillColor(GRAY);
+      main_points[i].setOrigin(3, 3);
+      main_points[i].setPosition(curves_[cur_curve_][i]);
     }
-    for (const auto &i : main_points_) {
+    for (const auto &i : main_points) {
       window_->draw(i);
     }
     // отрисовка линий от опорных точек к направляющим
-    for (int i = 0; i < size; i += 3) {
+    for (size_t i = 0; i < size; i += 3) {
       Vertex line[3];
-      line[0].position = Vector2f(points_[active_vector_][i].first, points_[active_vector_][i].second);
+      line[0].position = curves_[cur_curve_][i];
       line[0].color = GRAY;
-      line[1].position = Vector2f(points_[active_vector_][i + 1].first, points_[active_vector_][i + 1].second);
+      line[1].position = curves_[cur_curve_][i + 1];
       line[1].color = GRAY;
-      line[2].position = Vector2f(points_[active_vector_][i + 2].first, points_[active_vector_][i + 2].second);
+      line[2].position = curves_[cur_curve_][i + 2];
       line[2].color = GRAY;
       window_->draw(line, 3, LineStrip);
     }
   }
 }
 
-bool EditorScreen::IsOnCurve(const Vector2i &pos, const vector<pair<float, float>> &points) {
-  for (int i = 1; i < points.size(); i += 3) {
-    if (points.size() - i < 4) break;
+bool EditorScreen::IsCurveSelected(const Vector2i &pos, const vector<Vector2f> &curve) {
+  for (size_t i = 1; i < curve.size(); i += 3) {
+    if (curve.size() - i < 4) break;
     for (size_t j = 0; j <= 1000; ++j) {
       float t = j / 1000.f;
 
-      float cx = 3.f * (points[i + 1].first - points[i].first);
-      float bx = 3.f * (points[i + 2].first - points[i + 1].first) - cx;
-      float ax = points[i + 3].first - points[i].first - bx - cx;
+      Vector2f c = 3.f * (curve[i + 1] - curve[i]);
+      Vector2f b = 3.f * (curve[i + 2] - curve[i + 1]) - c;
+      Vector2f a = curve[i + 3] - curve[i] - b - c;
 
-      float cy = 3.f * (points[i + 1].second - points[i].second);
-      float by = 3.f * (points[i + 2].second - points[i + 1].second) - cy;
-      float ay = points[i + 3].second - points[i].second - by - cy;
+      Vector2f res = a * pow(t, 3) + b * pow(t, 2) + c * t + curve[i];
 
-      int x = (int) (ax * pow(t, 3) + bx * pow(t, 2) + cx * t + points[i].first);
-      int y = (int) (ay * pow(t, 3) + by * pow(t, 2) + cy * t + points[i].second);
-
-      double dst = sqrt(pow(x - pos.x, 2) + pow(y - pos.y, 2));
+      double dst = sqrt(pow(res.x - pos.x, 2) + pow(res.y - pos.y, 2));
       if (dst < 10) {
         return true;
       }
@@ -216,9 +231,9 @@ bool EditorScreen::IsOnCurve(const Vector2i &pos, const vector<pair<float, float
   return false;
 }
 
-int EditorScreen::IsOnPoint(const Vector2i &pos, const vector<pair<float, float>> &points) {
-  for (int i = 0; i < points.size(); ++i) {
-    double dst = sqrt(pow(points[i].first - pos.x, 2) + pow(points[i].second - pos.y, 2));
+int EditorScreen::GetSelectedPoint(const Vector2i &pos, const vector<Vector2f> &curve) {
+  for (size_t i = 0; i < curve.size(); ++i) {
+    double dst = sqrt(pow(curve[i].x - pos.x, 2) + pow(curve[i].y - pos.y, 2));
     if (dst < 10) {
       return i;
     }
@@ -226,67 +241,65 @@ int EditorScreen::IsOnPoint(const Vector2i &pos, const vector<pair<float, float>
   return -1;
 }
 
-void EditorScreen::Edit(const Vector2i &pos) {
-  float dx = points_[active_vector_][selected_point_].first - pos.x;
-  float dy = points_[active_vector_][selected_point_].second - pos.y;
-  points_[active_vector_][selected_point_] = {pos.x, pos.y};
-  if (selected_point_ % 3 == 1) {
+void EditorScreen::EditPoint(const Vector2f &to, int &point, vector<Vector2f> &curve) {
+  Vector2f delta = curve[point] - to;
+  curve[point] = to;
+  if (point % 3 == 1) {
     //выбрана опорная точка
-    points_[active_vector_][selected_point_ - 1].first -= dx;
-    points_[active_vector_][selected_point_ - 1].second -= dy;
-    points_[active_vector_][selected_point_ + 1].first -= dx;
-    points_[active_vector_][selected_point_ + 1].second -= dy;
-  } else if (selected_point_ % 3 == 0) {
-    // выбрана 1 направляющая
-    points_[active_vector_][selected_point_ + 2].first += dx;
-    points_[active_vector_][selected_point_ + 2].second += dy;
+    curve[point - 1] -= delta;
+    curve[point + 1] -= delta;
+  } else if (point % 3 == 0) {
+    // выбрана левая направляющая
+    Vector2f l1 = curve[point] - curve[point + 1];
+    float cos = l1.x / sqrt(l1.x * l1.x + l1.y * l1.y);
+    float sin = l1.y / sqrt(l1.x * l1.x + l1.y * l1.y);
+    Vector2f l2 = curve[point + 2] - curve[point + 1];
+    curve[point + 2] = curve[point + 1];
+    curve[point + 2].x -= sqrt(l2.x * l2.x + l2.y * l2.y) * cos;
+    curve[point + 2].y -= sqrt(l2.x * l2.x + l2.y * l2.y) * sin;
   } else {
-    // выбрана 2 направляющая
-    points_[active_vector_][selected_point_ - 2].first += dx;
-    points_[active_vector_][selected_point_ - 2].second += dy;
+    // выбрана правая направляющая
+    Vector2f l1 = curve[point] - curve[point - 1];
+    float cos = l1.x / sqrt(l1.x * l1.x + l1.y * l1.y);
+    float sin = l1.y / sqrt(l1.x * l1.x + l1.y * l1.y);
+    Vector2f l2 = curve[point - 2] - curve[point - 1];
+    curve[point - 2] = curve[point - 1];
+    curve[point - 2].x -= sqrt(l2.x * l2.x + l2.y * l2.y) * cos;
+    curve[point - 2].y -= sqrt(l2.x * l2.x + l2.y * l2.y) * sin;
   }
 }
 
-void EditorScreen::Remove(const Vector2i &pos) {
-  if (active_vector_ != -1) {
-    selected_point_ = IsOnPoint(pos, points_[active_vector_]);
-    if (selected_point_ != -1 && selected_point_ % 3 == 1) {
-      if (selected_point_ == 1) {
-        // обрезание левого края
-        if (points_[active_vector_].size() == 6) {
-          // остается одна точка из 2, удаляем обе
-          points_.erase(points_.begin() + active_vector_);
-          active_vector_ = -1;
-        } else {
-          points_[active_vector_].erase(points_[active_vector_].begin(),
-                                        points_[active_vector_].begin() + 3);
-        }
-      } else if (selected_point_ == points_[active_vector_].size() - 2) {
-        // обрезание правого края
-        if (points_[active_vector_].size() == 6) {
-          // остается одна точка из 2, удаляем обе
-          points_.erase(points_.begin() + active_vector_);
-          active_vector_ = -1;
-        } else {
-          points_[active_vector_].erase(points_[active_vector_].end() - 3,
-                                        points_[active_vector_].end());
-        }
-      } else {
-        // вырезание из центра, делится на 2 части
-        if (points_[active_vector_].size() == 9) {
-          // при вырезании центра из 3 точек, остаются 2 одиночные точки. удаляем их
-          points_.erase(points_.begin() + active_vector_);
-          active_vector_ = -1;
-        } else {
-          points_.emplace_back(points_[active_vector_].size() - selected_point_ - 2);
-          std::copy(points_[active_vector_].begin() + selected_point_ + 2,
-                    points_[active_vector_].end(),
-                    points_.back().begin());
-          points_[active_vector_].erase(points_[active_vector_].begin() + selected_point_ - 1,
-                                        points_[active_vector_].end());
-        }
-      }
-      selected_point_ = -1;
+void EditorScreen::RemovePoint(int &point, int &curve, vector<vector<Vector2f>> &curves) {
+  if (point == -1 || point % 3 != 1) return;
+  if (point == 1) {
+    // обрезание левого края
+    if (curves[curve].size() == 6) {
+      // остается одна точка из 2, удаляем обе
+      curves.erase(curves.begin() + curve);
+      curve = -1;
+    } else {
+      curves[curve].erase(curves[curve].begin(), curves[curve].begin() + 3);
+    }
+  } else if (point == curves[curve].size() - 2) {
+    // обрезание правого края
+    if (curves[curve].size() == 6) {
+      // остается одна точка из 2, удаляем обе
+      curves.erase(curves.begin() + curve);
+      curve = -1;
+    } else {
+      curves[curve].erase(curves[curve].end() - 3, curves[curve].end());
+    }
+  } else {
+    // вырезание из центра, делится на 2 части
+    if (curves[curve].size() == 9) {
+      // при вырезании центра из 3 точек остаются 2 одиночные точки. удаляем их
+      curves.erase(curves.begin() + curve);
+      curve = -1;
+    } else {
+      curves.emplace_back(curves[curve].size() - point - 2);
+      std::copy(curves[curve].begin() + point + 2, curves[curve].end(), curves.back().begin());
+      curves[curve].erase(curves[curve].begin() + point - 1, curves[curve].end());
     }
   }
+  point = -1;
 }

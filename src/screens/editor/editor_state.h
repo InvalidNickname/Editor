@@ -5,7 +5,8 @@ enum EditorState {
   EDIT = 1,
   DELETE = 2,
   SELECT = 3,
-  ADD = 4
+  ADD = 4,
+  DELETE_2 = 5
 };
 
 #endif

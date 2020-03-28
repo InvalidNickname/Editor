@@ -14,21 +14,19 @@ class EditorScreen : public Screen {
   using Screen::Screen;
 
  private:
-  const int WIDTH = 1920 - 32;
-  const int HEIGHT = 1080;
+  const Vector2u GUI_SIZE = Vector2u(32, 32);
   const Color GRAY{128, 128, 128};
 
-  Vector2u window_size_, initial_size_;
+  Vector2u window_size_, initial_size_, canvas_size_;
   View ui_;
   GUI *gui_;
   Sprite canvas_;
   Texture texture_;
-  Uint8 *pixels_ = new Uint8[WIDTH * HEIGHT * 4];
-  vector<vector<pair<float, float>>> points_;
-  int active_vector_{-1};
+  Uint8 *pixels_;
+  vector<vector<Vector2f>> curves_;
+  int cur_curve_{-1}, cur_point_{-1};
   EditorState cur_state_{ADD};
-  int selected_point_;
-  bool editing{false};
+  bool editing_{false};
 
   void Draw() override;
 
@@ -42,17 +40,17 @@ class EditorScreen : public Screen {
 
   void UpdateTexture();
 
-  void DrawCurve(const vector<pair<float, float>> &points);
+  void DrawCurve(const vector<Vector2f> &curve);
 
   void DrawHelpers();
 
-  static bool IsOnCurve(const Vector2i &pos, const vector<pair<float, float>> &points);
+  static bool IsCurveSelected(const Vector2i &pos, const vector<Vector2f> &curve);
 
-  static int IsOnPoint(const Vector2i &pos, const vector<pair<float, float>> &points);
+  static int GetSelectedPoint(const Vector2i &pos, const vector<Vector2f> &curve);
 
-  void Edit(const Vector2i &pos);
+  static void EditPoint(const Vector2f &to, int &point, vector<Vector2f> &curve);
 
-  void Remove(const Vector2i &pos);
+  static void RemovePoint(int &point, int &curve, vector<vector<Vector2f>> &curves);
 };
 
 #endif
