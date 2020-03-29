@@ -42,22 +42,29 @@ void EditorScreen::SetGUI() {
           AssetLoader::Get().GetTexture("btn_add_1"),
           [this]() { cur_state_ = ADD; }
       )),
-      pair("btn_remove", new Button(
+      pair("btn_add_2", new Button(
           Vector2f(0, GUI_SIZE.y + 64),
+          Vector2f(32, 32),
+          AssetLoader::Get().GetTexture("btn_add_2_0"),
+          AssetLoader::Get().GetTexture("btn_add_2_1"),
+          [this]() { cur_state_ = ADD_2; }
+      )),
+      pair("btn_remove", new Button(
+          Vector2f(0, GUI_SIZE.y + 96),
           Vector2f(32, 32),
           AssetLoader::Get().GetTexture("btn_remove_2_0"),
           AssetLoader::Get().GetTexture("btn_remove_2_1"),
           [this]() { cur_state_ = DELETE; }
       )),
       pair("btn_remove_2", new Button(
-          Vector2f(0, GUI_SIZE.y + 96),
+          Vector2f(0, GUI_SIZE.y + 128),
           Vector2f(32, 32),
           AssetLoader::Get().GetTexture("btn_remove_0"),
           AssetLoader::Get().GetTexture("btn_remove_1"),
           [this]() { cur_state_ = DELETE_2; }
       )),
       pair("btn_edit", new Button(
-          Vector2f(0, GUI_SIZE.y + 128),
+          Vector2f(0, GUI_SIZE.y + 160),
           Vector2f(32, 32),
           AssetLoader::Get().GetTexture("btn_edit_0"),
           AssetLoader::Get().GetTexture("btn_edit_1"),
@@ -71,6 +78,8 @@ AppState EditorScreen::DoAction() {
   UpdateTexture();
   return temp_state_;
 }
+
+#include <iostream>
 
 void EditorScreen::HandleInput() {
   Event event{};
@@ -129,6 +138,53 @@ void EditorScreen::HandleInput() {
                 break;
               case SELECT:
                 break;
+              case ADD_2:
+                if (GetSelectedPoint(pos, curve) % 3 != 1) {
+                  double min = DBL_MAX;
+                  int min_i = -1; // новая точка лежит между min_i + 1 и min_i + 2
+                  float min_t = 0;
+                  for (size_t i = 1; i < curve.size(); i += 3) {
+                    if (curve.size() - i < 4) break;
+                    for (size_t j = 0; j <= 1000; ++j) {
+                      float t = j / 1000.f;
+
+                      Vector2f c = 3.f * (curve[i + 1] - curve[i]);
+                      Vector2f b = 3.f * (curve[i + 2] - curve[i + 1]) - c;
+                      Vector2f a = curve[i + 3] - curve[i] - b - c;
+
+                      Vector2f res = a * pow(t, 3) + b * pow(t, 2) + c * t + curve[i];
+
+                      double dst = sqrt(pow(res.x - pos.x, 2) + pow(res.y - pos.y, 2));
+                      if (dst < min) {
+                        min = dst;
+                        min_i = i;
+                        min_t = t;
+                      }
+                    }
+                  }
+                  if (min > 10) break;
+
+                  Vector2f p00 = curve[min_i];
+                  Vector2f p10 = curve[min_i + 1];
+                  Vector2f p20 = curve[min_i + 2];
+                  Vector2f p30 = curve[min_i + 3];
+
+                  Vector2f p21 = p20 * (1 - min_t) + p30 * min_t;
+
+                  Vector2f p11 = p10 * (1 - min_t) + p20 * min_t;
+                  Vector2f p12 = p11 * (1 - min_t) + p21 * min_t;
+
+                  Vector2f p01 = p00 * (1 - min_t) + p10 * min_t;
+                  Vector2f p02 = p01 * (1 - min_t) + p11 * min_t;
+                  Vector2f p03 = p02 * (1 - min_t) + p12 * min_t;
+
+                  curve[min_i + 1] = p01;
+                  curve[min_i + 2] = p21;
+                  curve.insert(curve.begin() + min_i + 2, p02);
+                  curve.insert(curve.begin() + min_i + 3, p03);
+                  curve.insert(curve.begin() + min_i + 4, p12);
+                }
+                break;
               case ADD:
                 if (IsCyclic(curve)) break;
                 int tmp_curve = FindSelectedCurve(pos, curves_);
@@ -184,6 +240,7 @@ void EditorScreen::HandleInput() {
         }
       } else if (Mouse::isButtonPressed(Mouse::Right)) {
         cur_curve_ = -1;
+        editing_ = false;
       }
     }
     if (event.type == Event::Closed) {

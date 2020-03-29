@@ -16,6 +16,8 @@ AssetLoader::AssetLoader() {
   LoadTexture("btn_select.png", "btn_select_1", {64, 0, 64, 64});
   LoadTexture("btn_remove_2.png", "btn_remove_2_0", {0, 0, 64, 64});
   LoadTexture("btn_remove_2.png", "btn_remove_2_1", {64, 0, 64, 64});
+  LoadTexture("btn_add_2.png", "btn_add_2_0", {0, 0, 64, 64});
+  LoadTexture("btn_add_2.png", "btn_add_2_1", {64, 0, 64, 64});
 }
 
 Texture *AssetLoader::GetTexture(const string &name) const {
