@@ -86,49 +86,98 @@ void EditorScreen::HandleInput() {
             curves_.push_back({Vector2f(posf.x - 50, posf.y), posf, Vector2f(posf.x + 50, posf.y)});
             cur_curve_ = curves_.size() - 1;
           } else if (cur_state_ == SELECT) {
-            bool found{false};
-            for (int i = 0; i < curves_.size(); ++i) {
-              if (IsCurveSelected(pos, curves_[i])) {
-                cur_curve_ = i;
-                found = true;
-                break;
-              }
-            }
-            if (!found) cur_curve_ = -1;
+            cur_curve_ = FindSelectedCurve(pos, curves_);
           } else if (cur_curve_ != -1) {
             vector<Vector2f> &curve = curves_[cur_curve_];
             switch (cur_state_) {
-              case ADD:
-                curve.emplace_back(posf.x - 50, posf.y); // направляющая 1
-                curve.push_back(posf); // опорная
-                curve.emplace_back(posf.x + 50, posf.y); // направляющая 2
-                break;
               case EDIT:
                 if (!editing_) {
                   cur_point_ = GetSelectedPoint(pos, curve);
                   if (cur_point_ != -1) editing_ = true;
                 } else {
+                  if ((cur_point_ == 0 || cur_point_ == 1 || cur_point_ == 2) && IsCyclic(curve)) {
+                    EditPoint(posf, curve.size() - 3 + cur_point_, curve);
+                  }
                   EditPoint(posf, cur_point_, curve);
                   editing_ = false;
                 }
                 break;
               case DELETE:
                 cur_point_ = GetSelectedPoint(pos, curve);
+                if (cur_point_ == 1 && IsCyclic(curve)) {
+                  int tmp_point = curve.size() - 2;
+                  RemovePoint(tmp_point, cur_curve_, curves_);
+                }
                 RemovePoint(cur_point_, cur_curve_, curves_);
                 break;
               case DELETE_2:
                 cur_point_ = GetSelectedPoint(pos, curve);
-                if (cur_point_ != -1 && cur_point_ % 3 == 1) {
-                  if (curve.size() == 6) {
-                    // остается одна точка из 2, удаляем обе
-                    curves_.erase(curves_.begin() + cur_curve_);
-                    cur_curve_ = -1;
+                if (cur_point_ == -1 || cur_point_ % 3 != 1) break;
+                if (curve.size() == 6) {
+                  // остается одна точка из 2, удаляем обе
+                  curves_.erase(curves_.begin() + cur_curve_);
+                  cur_curve_ = -1;
+                } else {
+                  if (cur_point_ == 1 && IsCyclic(curve)) {
+                    curve.erase(curve.begin(), curve.begin() + 3);
+                    curve.erase(curve.end() - 3, curve.end());
+                    curve.insert(curve.end(), curve.begin(), curve.begin() + 3);
                   } else {
                     curve.erase(curve.begin() + cur_point_ - 1, curve.begin() + cur_point_ + 2);
                   }
                 }
                 break;
               case SELECT:
+                break;
+              case ADD:
+                if (IsCyclic(curve)) break;
+                int tmp_curve = FindSelectedCurve(pos, curves_);
+                if (tmp_curve == -1) {
+                  // просто добавляем точку в конец выбранной кривой
+                  curve.emplace_back(posf.x - 50, posf.y); // направляющая 1
+                  curve.push_back(posf); // опорная
+                  curve.emplace_back(posf.x + 50, posf.y); // направляющая 2
+                } else {
+                  int tmp_point = GetSelectedPoint(pos, curves_[tmp_curve]);
+                  if (tmp_curve != cur_curve_) {
+                    // соединения с другими кривыми
+                    if (tmp_point == 1) {
+                      if (IsCyclic(curves_[tmp_curve])) break;
+                      // соединяем конец выбранной кривой с началом другой кривой
+                      curve.insert(curve.end(), curves_[tmp_curve].begin(), curves_[tmp_curve].end());
+                      curves_.erase(curves_.begin() + tmp_curve);
+                      if (tmp_curve < cur_curve_) {
+                        cur_curve_--;
+                      }
+                    } else if (tmp_point == curves_[tmp_curve].size() - 2) {
+                      if (IsCyclic(curves_[tmp_curve])) break;
+                      // соединяем конец выбранной кривой с концом другой
+                      curve.insert(curve.end(), curves_[tmp_curve].rbegin(), curves_[tmp_curve].rend());
+                      curves_.erase(curves_.begin() + tmp_curve);
+                      if (tmp_curve < cur_curve_) {
+                        cur_curve_--;
+                      }
+                    } else {
+                      // просто добавляем точку в конец выбранной кривой
+                      curve.emplace_back(posf.x - 50, posf.y); // направляющая 1
+                      curve.push_back(posf); // опорная
+                      curve.emplace_back(posf.x + 50, posf.y); // направляющая 2
+                    }
+                  } else {
+                    if (IsCyclic(curves_[tmp_curve])) break;
+                    // соединение с собой (зацикливание)
+                    if (tmp_point == 1) {
+                      curve.push_back(curve[0]); // направляющая 1
+                      curve.push_back(curve[1]); // опорная
+                      curve.emplace_back(curve[2]); // направляющая 2
+                    } else {
+                      // просто добавляем точку в конец выбранной кривой
+                      curve.emplace_back(posf.x - 50, posf.y); // направляющая 1
+                      curve.push_back(posf); // опорная
+                      curve.emplace_back(posf.x + 50, posf.y); // направляющая 2
+                    }
+                  }
+                }
                 break;
             }
           }
@@ -241,7 +290,7 @@ int EditorScreen::GetSelectedPoint(const Vector2i &pos, const vector<Vector2f> &
   return -1;
 }
 
-void EditorScreen::EditPoint(const Vector2f &to, int &point, vector<Vector2f> &curve) {
+void EditorScreen::EditPoint(const Vector2f &to, int point, vector<Vector2f> &curve) {
   Vector2f delta = curve[point] - to;
   curve[point] = to;
   if (point % 3 == 1) {
@@ -302,4 +351,20 @@ void EditorScreen::RemovePoint(int &point, int &curve, vector<vector<Vector2f>> 
     }
   }
   point = -1;
+}
+
+int EditorScreen::FindSelectedCurve(const Vector2i &pos, vector<vector<Vector2f>> &curves) {
+  int cur_curve = -1;
+  for (int i = 0; i < curves.size(); ++i) {
+    if (IsCurveSelected(pos, curves[i])) {
+      cur_curve = i;
+      break;
+    }
+  }
+  return cur_curve;
+}
+
+bool EditorScreen::IsCyclic(const vector<Vector2f> &curve) {
+  int size = curve.size();
+  return size != 3 && curve[2] == curve[size - 1] && curve[1] == curve[size - 2] && curve[0] == curve[size - 3];
 }

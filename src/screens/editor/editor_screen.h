@@ -48,9 +48,13 @@ class EditorScreen : public Screen {
 
   static int GetSelectedPoint(const Vector2i &pos, const vector<Vector2f> &curve);
 
-  static void EditPoint(const Vector2f &to, int &point, vector<Vector2f> &curve);
+  static void EditPoint(const Vector2f &to, int point, vector<Vector2f> &curve);
 
   static void RemovePoint(int &point, int &curve, vector<vector<Vector2f>> &curves);
+
+  static int FindSelectedCurve(const Vector2i &pos, vector<vector<Vector2f>> &curves);
+
+  static bool IsCyclic(const vector<Vector2f> &curve);
 };
 
 #endif
