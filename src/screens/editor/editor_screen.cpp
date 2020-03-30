@@ -71,6 +71,13 @@ void EditorScreen::SetGUI() {
           [this]() { cur_state_ = EDIT; }
       ))
   }, "btn_select"));
+  gui_->AddObject("btn_exit", new Button(
+      Vector2f(window_size_.x - 32, 0),
+      Vector2f(32, 32),
+      AssetLoader::Get().GetTexture("btn_exit_0"),
+      AssetLoader::Get().GetTexture("btn_exit_1"),
+      [this]() { temp_state_ = EXIT; }
+  ));
 }
 
 AppState EditorScreen::DoAction() {
@@ -78,8 +85,6 @@ AppState EditorScreen::DoAction() {
   UpdateTexture();
   return temp_state_;
 }
-
-#include <iostream>
 
 void EditorScreen::HandleInput() {
   Event event{};
@@ -113,9 +118,18 @@ void EditorScreen::HandleInput() {
                 break;
               case DELETE:
                 cur_point_ = GetSelectedPoint(pos, curve);
-                if (cur_point_ == 1 && IsCyclic(curve)) {
-                  int tmp_point = curve.size() - 2;
-                  RemovePoint(tmp_point, cur_curve_, curves_);
+                if (cur_point_ % 3 != 1) break;
+                if (IsCyclic(curve)) {
+                  if (cur_point_ == 1) {
+                    int tmp_point = curve.size() - 2;
+                    RemovePoint(tmp_point, cur_curve_, curves_);
+                  } else {
+                    vector<Vector2f> tmp_curve;
+                    tmp_curve.insert(tmp_curve.end(), curve.begin() + cur_point_ + 2, curve.end());
+                    tmp_curve.insert(tmp_curve.end(), curve.begin() + 3, curve.begin() + cur_point_ - 1);
+                    curve = tmp_curve;
+                    break;
+                  }
                 }
                 RemovePoint(cur_point_, cur_curve_, curves_);
                 break;
@@ -178,8 +192,16 @@ void EditorScreen::HandleInput() {
                   Vector2f p02 = p01 * (1 - min_t) + p11 * min_t;
                   Vector2f p03 = p02 * (1 - min_t) + p12 * min_t;
 
-                  curve[min_i + 1] = p01;
-                  curve[min_i + 2] = p21;
+                  if (min_i + 1 == 2 && IsCyclic(curve)) {
+                    EditPoint(p01, curve.size() - 1, curve);
+                  }
+                  EditPoint(p01, min_i + 1, curve);
+
+                  if (min_i + 2 == curve.size() - 3 && IsCyclic(curve)) {
+                    EditPoint(p21, 0, curve);
+                  }
+                  EditPoint(p21, min_i + 2, curve);
+
                   curve.insert(curve.begin() + min_i + 2, p02);
                   curve.insert(curve.begin() + min_i + 3, p03);
                   curve.insert(curve.begin() + min_i + 4, p12);

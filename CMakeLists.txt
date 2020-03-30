@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 3.14)
 project(Editor)
 set(CMAKE_CXX_STANDARD 17)
 
-include(ExternalProject)
-
 set(SOURCE_FILES src/main.cpp src/screens/screen_manager.cpp src/screens/splashscreen/splash_screen.cpp
         src/screens/editor/editor_screen.cpp src/utils/asset_loader.cpp src/utils/r.h src/screens/editor/editor_state.h)
 if (WIN32)
@@ -44,5 +42,5 @@ add_custom_command(TARGET Editor POST_BUILD
 install(TARGETS Editor
         RUNTIME DESTINATION build
         LIBRARY DESTINATION build)
-install(DIRECTORY assets/ DESTINATION build PATTERN "last_settings.json" EXCLUDE)
+install(DIRECTORY assets/ DESTINATION build)
 install(DIRECTORY ${SFML_INSTALL}/bin/ DESTINATION build)
