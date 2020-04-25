@@ -8,6 +8,14 @@ Button::Button(Vector2f position, Vector2f size, Texture *normal, Texture *click
   sprite_.setPosition(position.x, position.y);
 }
 
+Button::Button(Vector2f position, Vector2f size, Texture *normal, Texture *clicked, fvoid onClick, fvoid onNotClick)
+    : normal_(normal), clicked_(clicked), onClick_(move(onClick)), onNotClick_(move(onNotClick)) {
+  sprite_.setTexture(*normal);
+  auto texture_size = normal->getSize();
+  sprite_.setScale((float) size.x / texture_size.x, (float) size.y / texture_size.y);
+  sprite_.setPosition(position.x, position.y);
+}
+
 void Button::Render(RenderWindow *window) {
   window->draw(sprite_);
 }
@@ -28,5 +36,8 @@ void Button::SetClicked(bool clicked) {
     onClick_();
   } else {
     sprite_.setTexture(*normal_);
+    if (onNotClick_ != nullptr) {
+      onNotClick_();
+    }
   }
 }

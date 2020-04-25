@@ -20,6 +20,9 @@ AssetLoader::AssetLoader() {
   LoadTexture("btn_add_2.png", "btn_add_2_1", {64, 0, 64, 64});
   LoadTexture("btn_exit.png", "btn_exit_0", {0, 0, 64, 64});
   LoadTexture("btn_exit.png", "btn_exit_1", {64, 0, 64, 64});
+  LoadTexture("menu_background.png", "menu_background", {0, 0, 48, 48});
+
+  LoadFont("abel.ttf", "default");
 }
 
 Texture *AssetLoader::GetTexture(const string &name) const {

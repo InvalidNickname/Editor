@@ -16,9 +16,10 @@ bool RadioButtons::CheckClicked(Vector2f coords) {
     if (i.second->CheckClicked(coords)) {
       clicked_ = i.first;
       check = true;
+      break;
     }
   }
-  SetClicked(clicked_);
+  if (!clicked_.empty()) SetClicked(clicked_);
   return check;
 }
 
@@ -28,4 +29,12 @@ void RadioButtons::SetClicked(const string &name) {
     i.second->SetClicked(false);
   }
   buttons_->at(clicked_)->SetClicked(true);
+}
+
+map<string, Button *> *RadioButtons::GetMap() {
+  return buttons_;
+}
+
+RadioButtons::RadioButtons() {
+  buttons_ = new map<string, Button *>();
 }

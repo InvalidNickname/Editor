@@ -9,12 +9,13 @@
 #include "ui_drawable.h"
 
 using namespace std;
+using fvoid = function<void()>;
 
 class Button : public UIDrawable {
 
  public:
-  Button(Vector2f position, Vector2f size, Texture *normal, Texture *clicked, function<void()> onClick);
-
+  Button(Vector2f position, Vector2f size, Texture *normal, Texture *clicked, fvoid onClick);
+  Button(Vector2f position, Vector2f size, Texture *normal, Texture *clicked, fvoid onClick, fvoid onNotClick);
   void Render(RenderWindow *window) override;
 
   bool CheckClicked(Vector2f coords) override;
@@ -27,6 +28,7 @@ class Button : public UIDrawable {
   Sprite sprite_;
   Texture *normal_, *clicked_;
   const function<void()> onClick_;
+  const function<void()> onNotClick_;
 };
 
 #endif

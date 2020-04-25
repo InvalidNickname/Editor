@@ -1,3 +1,4 @@
+#include <chrono>
 #include "editor_screen.h"
 
 void EditorScreen::Prepare() {
@@ -77,6 +78,20 @@ void EditorScreen::SetGUI() {
       AssetLoader::Get().GetTexture("btn_exit_0"),
       AssetLoader::Get().GetTexture("btn_exit_1"),
       [this]() { temp_state_ = EXIT; }
+  ));
+  gui_->AddObject("btn_save", new Button(
+      Vector2f(0, 0),
+      Vector2f(32, 32),
+      AssetLoader::Get().GetTexture("btn_exit_0"),
+      AssetLoader::Get().GetTexture("btn_exit_1"),
+      [this]() { Save(); }
+  ));
+  gui_->AddObject("btn_load", new Button(
+      Vector2f(32, 0),
+      Vector2f(32, 32),
+      AssetLoader::Get().GetTexture("btn_exit_0"),
+      AssetLoader::Get().GetTexture("btn_exit_1"),
+      [this]() { Load(); }
   ));
 }
 
@@ -242,7 +257,6 @@ void EditorScreen::HandleInput() {
                       curve.emplace_back(posf.x + 50, posf.y); // направляющая 2
                     }
                   } else {
-                    if (IsCyclic(curves_[tmp_curve])) break;
                     // соединение с собой (зацикливание)
                     if (tmp_point == 1) {
                       curve.push_back(curve[0]); // направляющая 1
@@ -446,4 +460,102 @@ int EditorScreen::FindSelectedCurve(const Vector2i &pos, vector<vector<Vector2f>
 bool EditorScreen::IsCyclic(const vector<Vector2f> &curve) {
   int size = curve.size();
   return size != 3 && curve[2] == curve[size - 1] && curve[1] == curve[size - 2] && curve[0] == curve[size - 3];
+}
+
+void EditorScreen::Save() {
+  ofstream out;
+  long long time = chrono::system_clock::now().time_since_epoch().count();
+  string filename = "saves/" + to_string(time) + ".txt";
+  out.open(filename);
+  if (out.is_open()) {
+    for (auto &curve : curves_) {
+      for (auto &point: curve) {
+        out << to_string(point.x) << " " << to_string(point.y) << " ";
+      }
+      out << "\n";
+    }
+    out.close();
+  }
+}
+
+void EditorScreen::Load() {
+  string saves_dir = "saves";
+  vector<string> files{};
+  for (const auto &entry : filesystem::directory_iterator(saves_dir)) {
+    if (entry.path().filename().string() != "dummy") files.push_back(entry.path().filename().string());
+  }
+  gui_->AddObject("load_menu_buttons", new RadioButtons());
+  for (int i = 0; i < files.size(); ++i) {
+    string filename = files[i];
+    if (filename.length() > 21) {
+      filename.resize(18);
+      filename.append("...");
+    }
+    ((RadioButtons *) gui_->Get("load_menu_buttons"))->GetMap()->insert(pair(to_string(i), new Button(
+        Vector2f(32, 32 + 25 * i),
+        Vector2f(230, 25),
+        AssetLoader::Get().GetTexture("menu_background"),
+        AssetLoader::Get().GetTexture("menu_background"),
+        [this, files, i] {
+          LoadFile(files[i]);
+          gui_->DeleteObject("load_menu_buttons");
+          for (int j = 0; j < files.size(); ++j) {
+            gui_->DeleteObject("load_menu_text_" + to_string(j));
+          }
+        },
+        [this, files] {
+          gui_->DeleteObject("load_menu_buttons");
+          for (int j = 0; j < files.size(); ++j) {
+            gui_->DeleteObject("load_menu_text_" + to_string(j));
+          }
+        }
+    )));
+    gui_->AddObject("load_menu_text_" + to_string(i), new DrawableText(
+        Vector2f(35, 32 + 25 * i),
+        filename,
+        20,
+        AssetLoader::Get().GetFont("default"),
+        Color::Black
+    ));
+  }
+}
+
+#include <iostream>
+
+void EditorScreen::LoadFile(const string &name) {
+  // на всякий
+  //Save();
+  // восстанавливаем настройки
+  curves_.erase(curves_.begin(), curves_.end());
+  cur_curve_ = -1;
+  cur_point_ = -1;
+  cur_state_ = ADD;
+  editing_ = false;
+  // загрузка
+  ifstream in("saves/" + name);
+  if (in.is_open()) {
+    string line;
+    Vector2f temp;
+    bool first = true;
+    while (getline(in, line)) {
+      curves_.emplace_back();
+      uint32_t last_space = -1;
+      float parsed_coord;
+      for (int i = 0; i < line.size(); ++i) {
+        if (line[i] == ' ') {
+          parsed_coord = stof(line.substr(last_space + 1, i - last_space - 1));
+          last_space = i;
+          if (first) {
+            temp.x = parsed_coord;
+            first = false;
+          } else {
+            temp.y = parsed_coord;
+            curves_.back().push_back(temp);
+            first = true;
+          }
+        }
+      }
+    }
+  }
+  in.close();
 }

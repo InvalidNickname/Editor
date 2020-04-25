@@ -12,6 +12,8 @@ class RadioButtons : public UIDrawable {
  public:
   RadioButtons(map<string, Button *> *buttons, const string &default_clicked);
 
+  RadioButtons();
+
   void Render(RenderWindow *window) override;
 
   [[nodiscard]] bool CheckClicked(Vector2f coords) override;
@@ -19,6 +21,8 @@ class RadioButtons : public UIDrawable {
   [[nodiscard]] bool IsClickable() override { return true; }
 
   void SetClicked(const string &name);
+
+  map<string, Button *> *GetMap();
 
  private:
   map<string, Button *> *buttons_;

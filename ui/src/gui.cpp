@@ -22,3 +22,7 @@ void GUI::AddObject(const string &name, UIDrawable *drawable) {
 UIDrawable *GUI::Get(const string &name) const {
   return drawables_.at(name);
 }
+
+void GUI::DeleteObject(const string &name) {
+  drawables_.erase(name);
+}

@@ -17,6 +17,8 @@ class GUI {
 
   void AddObject(const string &name, UIDrawable *drawable);
 
+  void DeleteObject(const string &name);
+
   [[nodiscard]] UIDrawable *Get(const string &name) const;
 
  private:

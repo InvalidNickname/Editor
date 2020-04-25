@@ -1,9 +1,14 @@
 #ifndef MGD_SRC_SCREENS_MAP_MAP_SCREEN_H
 #define MGD_SRC_SCREENS_MAP_MAP_SCREEN_H
 
+#include <fstream>
+#include <chrono>
+#include <filesystem>
+
 #include <gui.h>
 #include <radio_buttons.h>
 #include <drawable_text.h>
+#include <drawable_image.h>
 
 #include "screens/screen.h"
 #include "editor_state.h"
@@ -55,6 +60,12 @@ class EditorScreen : public Screen {
   static int FindSelectedCurve(const Vector2i &pos, vector<vector<Vector2f>> &curves);
 
   static bool IsCyclic(const vector<Vector2f> &curve);
+
+  void Save();
+
+  void Load();
+
+  void LoadFile(const string &name);
 };
 
 #endif
