@@ -82,15 +82,15 @@ void EditorScreen::SetGUI() {
   gui_->AddObject("btn_save", new Button(
       Vector2f(0, 0),
       Vector2f(32, 32),
-      AssetLoader::Get().GetTexture("btn_exit_0"),
-      AssetLoader::Get().GetTexture("btn_exit_1"),
+      AssetLoader::Get().GetTexture("btn_save_0"),
+      AssetLoader::Get().GetTexture("btn_save_1"),
       [this]() { Save(); }
   ));
   gui_->AddObject("btn_load", new Button(
       Vector2f(32, 0),
       Vector2f(32, 32),
-      AssetLoader::Get().GetTexture("btn_exit_0"),
-      AssetLoader::Get().GetTexture("btn_exit_1"),
+      AssetLoader::Get().GetTexture("btn_load_0"),
+      AssetLoader::Get().GetTexture("btn_load_1"),
       [this]() { Load(); }
   ));
 }
