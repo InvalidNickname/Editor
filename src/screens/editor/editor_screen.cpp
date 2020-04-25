@@ -520,8 +520,6 @@ void EditorScreen::Load() {
   }
 }
 
-#include <iostream>
-
 void EditorScreen::LoadFile(const string &name) {
   // на всякий
   //Save();
